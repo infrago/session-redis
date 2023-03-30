@@ -3,8 +3,6 @@ package session_redis
 import (
 	"encoding/base64"
 	"errors"
-	"fmt"
-	"strconv"
 	"sync"
 	"time"
 
@@ -144,40 +142,8 @@ func (this *redisConnect) Close() error {
 	return nil
 }
 
-func (this *redisConnect) Sequence(key string, start, step int64, expiry time.Duration) (int64, error) {
-	//加并发锁，忘记之前为什么加了，应该是有问题加了才正常的
-	// this.mutex.Lock()
-	// defer this.mutex.Unlock()
-
-	if this.client == nil {
-		return -1, errInvalidCacheConnection
-	}
-
-	value := start
-
-	if data, err := this.Read(key); err == nil {
-		num, err := strconv.ParseInt(string(data), 10, 64)
-		if err == nil {
-			value = num
-		}
-	}
-
-	//加数字
-	value += step
-
-	//写入值
-	data := []byte(fmt.Sprintf("%v", value))
-	err := this.Write(key, data, expiry)
-	if err != nil {
-		log.Warning("session.redis.serial", err)
-		return int64(0), err
-	}
-
-	return value, nil
-}
-
 // 查询会话，
-func (this *redisConnect) Exists(key string) (bool, error) {
+func (this *redisConnect) Exists(id string) (bool, error) {
 	if this.client == nil {
 		return false, errInvalidCacheConnection
 	}
@@ -185,7 +151,7 @@ func (this *redisConnect) Exists(key string) (bool, error) {
 	conn := this.client.Get()
 	defer conn.Close()
 
-	exists, err := redis.Int(conn.Do("EXISTS", key))
+	exists, err := redis.Int(conn.Do("EXISTS", id))
 	if err != nil {
 		log.Warning("session.redis.exists", err)
 		return false, err
@@ -199,7 +165,7 @@ func (this *redisConnect) Exists(key string) (bool, error) {
 }
 
 // 查询会话
-func (this *redisConnect) Read(key string) ([]byte, error) {
+func (this *redisConnect) Read(id string) ([]byte, error) {
 	if this.client == nil {
 		return nil, errInvalidCacheConnection
 	}
@@ -207,7 +173,7 @@ func (this *redisConnect) Read(key string) ([]byte, error) {
 	conn := this.client.Get()
 	defer conn.Close()
 
-	value, err := redis.String(conn.Do("GET", key))
+	value, err := redis.String(conn.Do("GET", id))
 	if err != nil && err != redis.ErrNil {
 		log.Warning("session.redis.read", err)
 		return nil, err
@@ -220,7 +186,7 @@ func (this *redisConnect) Read(key string) ([]byte, error) {
 }
 
 // 更新会话
-func (this *redisConnect) Write(key string, data []byte, expiry time.Duration) error {
+func (this *redisConnect) Write(id string, data []byte, expiry time.Duration) error {
 	if this.client == nil {
 		return errInvalidCacheConnection
 	}
@@ -234,7 +200,7 @@ func (this *redisConnect) Write(key string, data []byte, expiry time.Duration) e
 	defer conn.Close()
 
 	args := []Any{
-		key, value,
+		id, value,
 	}
 	if expiry > 0 {
 		args = append(args, "EX", expiry.Seconds())
@@ -250,7 +216,7 @@ func (this *redisConnect) Write(key string, data []byte, expiry time.Duration) e
 }
 
 // 删除会话
-func (this *redisConnect) Delete(key string) error {
+func (this *redisConnect) Delete(id string) error {
 	if this.client == nil {
 		return errInvalidCacheConnection
 	}
@@ -258,7 +224,7 @@ func (this *redisConnect) Delete(key string) error {
 	conn := this.client.Get()
 	defer conn.Close()
 
-	_, err := conn.Do("DEL", key)
+	_, err := conn.Do("DEL", id)
 	if err != nil {
 		return err
 	}
@@ -273,13 +239,13 @@ func (this *redisConnect) Clear(prefix string) error {
 	conn := this.client.Get()
 	defer conn.Close()
 
-	keys, err := this.Keys(prefix)
+	ids, err := this.Keys(prefix)
 	if err != nil {
 		return err
 	}
 
-	for _, key := range keys {
-		_, err := conn.Do("DEL", key)
+	for _, id := range ids {
+		_, err := conn.Do("DEL", id)
 		if err != nil {
 			return err
 		}
@@ -295,14 +261,14 @@ func (this *redisConnect) Keys(prefix string) ([]string, error) {
 	conn := this.client.Get()
 	defer conn.Close()
 
-	keys := []string{}
+	ids := []string{}
 
 	alls, _ := redis.Strings(conn.Do("KEYS", prefix+"*"))
-	for _, key := range alls {
-		keys = append(keys, key)
+	for _, id := range alls {
+		ids = append(ids, id)
 	}
 
-	return keys, nil
+	return ids, nil
 }
 
 //-------------------- redisBase end -------------------------
