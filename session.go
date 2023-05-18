@@ -36,7 +36,7 @@ type (
 		Server   string //服务器地址，ip:端口
 		Password string //服务器auth密码
 		Database string //数据库
-		Expiry   time.Duration
+		Expire   time.Duration
 
 		Idle    int //最大空闲连接
 		Active  int //最大激活连接，同时最大并发
@@ -186,7 +186,7 @@ func (this *redisConnect) Read(id string) ([]byte, error) {
 }
 
 // 更新会话
-func (this *redisConnect) Write(id string, data []byte, expiry time.Duration) error {
+func (this *redisConnect) Write(id string, data []byte, expire time.Duration) error {
 	if this.client == nil {
 		return errInvalidCacheConnection
 	}
@@ -202,8 +202,8 @@ func (this *redisConnect) Write(id string, data []byte, expiry time.Duration) er
 	args := []Any{
 		id, value,
 	}
-	if expiry > 0 {
-		args = append(args, "EX", expiry.Seconds())
+	if expire > 0 {
+		args = append(args, "EX", expire.Seconds())
 	}
 
 	_, err := conn.Do("SET", args...)
