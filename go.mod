@@ -1,4 +1,4 @@
 module github.com/infrago/session-redis
 
-go 1.17
+go 1.18
 
